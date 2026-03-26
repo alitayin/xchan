@@ -265,6 +265,52 @@ function buildCombinedAnalysisQuery(msg) {
     }
 }
 
+/**
+ * Extract common sender fields from a message.
+ * @param {object} msg
+ * @returns {{ isFromChannel: boolean, senderId: number }}
+ */
+function buildSenderContext(msg) {
+    const isFromChannel = !msg.from && msg.sender_chat && msg.sender_chat.type === 'channel';
+    const senderId = msg.from ? msg.from.id : (msg.sender_chat ? msg.sender_chat.id : 0);
+    return { isFromChannel, senderId };
+}
+
+/**
+ * Run in-memory cache checks before calling the AI API.
+ * Returns 'image_spam', 'text_spam', or null if no cache hit.
+ * @param {object} msg
+ * @param {object} bot
+ * @param {string} query
+ * @returns {Promise<'image_spam'|'text_spam'|null>}
+ */
+async function runCacheChecks(msg, bot, query) {
+    const possibleImageFileId = getImageFileId(msg);
+    if (possibleImageFileId && await isSpamImage(bot, possibleImageFileId)) {
+        return 'image_spam';
+    }
+    if (isSimilarToSpam(query, 95)) {
+        return 'text_spam';
+    }
+    return null;
+}
+
+/**
+ * Call the AI analysis API (text or image) and return the answer object.
+ * Returns null if the API call fails.
+ * @param {string} query
+ * @param {string[]} imageUrls
+ * @param {number} senderId
+ * @returns {Promise<object|null>}
+ */
+async function runApiAnalysis(query, imageUrls, senderId) {
+    if (imageUrls.length > 0) {
+        console.log(`Analyzing message with ${imageUrls.length} image(s)`);
+        return fetchMessageAnalysisWithImage(query || 'Analyze this image for spam content', imageUrls, senderId);
+    }
+    return fetchMessageAnalysis(query, senderId);
+}
+
 async function handleSpamMessage(msg, bot, spamData, query, imageUrls = []) {
     const { deviation, suspicion, inducement, spam } = spamData;
     const primarySpam = isSpamMessage({
@@ -279,7 +325,7 @@ async function handleSpamMessage(msg, bot, spamData, query, imageUrls = []) {
     });
 
     if (decideSecondarySpamCheck(primarySpam)) {
-        const senderId = msg.from ? msg.from.id : (msg.sender_chat ? msg.sender_chat.id : 0);
+        const { senderId } = buildSenderContext(msg);
         const additionalSpam = await performSecondarySpamCheck(query, senderId, imageUrls);
         if (additionalSpam === true) {
             await handleSpamDeletion(msg, bot, query);
@@ -291,8 +337,7 @@ async function handleSpamMessage(msg, bot, spamData, query, imageUrls = []) {
 
 async function handleSpamDeletion(msg, bot, query = null, skipCache = false) {
     try {
-        const isFromChannel = !msg.from && msg.sender_chat;
-        const senderId = msg.from ? msg.from.id : (msg.sender_chat ? msg.sender_chat.id : 0);
+        const { isFromChannel, senderId } = buildSenderContext(msg);
         
         // Add spam message/image to cache (skip if it's similar to existing spam)
         if (!skipCache) {
@@ -426,9 +471,8 @@ async function processGroupMessage(msg, bot, ports) {
 
     // Ignore bot messages; only track human users for trust / spam detection
     // Allow messages from channels (sender_chat) for spam detection
-    const isFromChannel = !msg.from && msg.sender_chat && msg.sender_chat.type === 'channel';
+    const { isFromChannel, senderId } = buildSenderContext(msg);
     const isFromBot = msg.from && msg.from.is_bot;
-    const senderId = msg.from ? msg.from.id : (msg.sender_chat ? msg.sender_chat.id : 0);
     
     if (!msg.from && !isFromChannel) {
         return;
@@ -561,32 +605,17 @@ async function processGroupMessage(msg, bot, ports) {
         return;
     }
 
-    // Check if image is spam (similarity check) before calling API
-    const possibleImageFileId = getImageFileId(msg);
-    if (possibleImageFileId && await isSpamImage(bot, possibleImageFileId)) {
-        console.log('Image is similar to cached spam image, deleting without API call');
-        await handleSpamDeletion(msg, bot, query, true); // skipCache = true, no need to cache similar spam
+    // Run in-memory cache checks before hitting the API
+    const cacheHit = await runCacheChecks(msg, bot, query);
+    if (cacheHit) {
+        console.log(`Cache hit (${cacheHit}), deleting without API call`);
+        await handleSpamDeletion(msg, bot, query, true);
         return;
     }
 
-    // Check similarity with cached spam messages before calling API
-    if (isSimilarToSpam(query, 95)) {
-        console.log('Message is similar to cached spam (>=95%), deleting without API call');
-        await handleSpamDeletion(msg, bot, query, true); // skipCache = true, no need to cache similar spam
-        return;
-    }
-
-    // Get image URLs if present
+    // Call AI analysis API
     const imageUrls = await getImageUrls(msg, bot);
-    let answer;
-
-    if (imageUrls.length > 0) {
-        console.log(`Analyzing message with ${imageUrls.length} image(s)`);
-        answer = await fetchMessageAnalysisWithImage(query || 'Analyze this image for spam content', imageUrls, senderId);
-    } else {
-        answer = await fetchMessageAnalysis(query, senderId);
-    }
-    
+    const answer = await runApiAnalysis(query, imageUrls, senderId);
     if (!answer) {
         console.log('No analysis result, skip');
         return;
