@@ -11,19 +11,26 @@ const MISSIONS_REQUIRED = 10; // Number of missions required for reward
 const REWARD_TOKEN_ALIAS = 'COR'; // Token to send as reward
 const REWARD_AMOUNT = 1; // Amount of tokens to send
 
+let rewardRunInProgress = false;
+
 /**
  * Check all users and send rewards to those who completed 10+ missions
  * @param {object} bot - Telegram bot instance
  */
 async function checkAndDistributeRewards(bot) {
-    console.log('\n🎁 Starting mission reward check...');
-    
-    if (!isMnemonicConfigured()) {
-        console.error('❌ MNEMONIC not configured - cannot send rewards');
+    if (rewardRunInProgress) {
+        console.warn('Mission reward run already in progress, skipping this cycle');
         return;
     }
+    rewardRunInProgress = true;
+    console.log('\n🎁 Starting mission reward check...');
 
     try {
+        if (!isMnemonicConfigured()) {
+            console.error('❌ MNEMONIC not configured - cannot send rewards');
+            return;
+        }
+
         // Get all user stats
         const allStats = await getAllUserStats();
         console.log(`📊 Checking ${allStats.length} users for rewards...`);
@@ -55,6 +62,8 @@ async function checkAndDistributeRewards(bot) {
         console.log('✅ Mission reward check completed');
     } catch (error) {
         console.error('❌ Error during reward distribution:', error);
+    } finally {
+        rewardRunInProgress = false;
     }
 }
 
@@ -79,8 +88,8 @@ async function processUserReward(bot, userId, userStats, tokenId, tokenDecimals,
     const recipientAddress = ensureAddressWithFallback(addressData.address);
     const username = addressData.username || 'unknown';
 
-    // Calculate reward amount in base units
-    const amountInBaseUnits = REWARD_AMOUNT * Math.pow(10, tokenDecimals);
+    // Calculate reward amount in base units (use BigInt to avoid float precision issues)
+    const amountInBaseUnits = Number(BigInt(REWARD_AMOUNT) * (10n ** BigInt(tokenDecimals)));
     const recipients = [{ address: recipientAddress, amount: amountInBaseUnits }];
 
     // Send tokens

@@ -173,9 +173,13 @@ function shouldHandleRequest(msg) {
 function registerRoutes(bot) {
     const ports = createPorts(bot);
     // Listener 1: store group messages
-    bot.on('message', async (msg) => {
+    bot.on('message', (msg) => {
         if (isGroupMessage(msg)) {
-            addMessageToGroup(msg.chat.id, msg);
+            try {
+                addMessageToGroup(msg.chat.id, msg);
+            } catch (err) {
+                console.error('addMessageToGroup failed:', err);
+            }
         }
     });
 
@@ -190,7 +194,9 @@ function registerRoutes(bot) {
         try {
             const member = await bot.getChatMember(msg.chat.id, msg.from.id);
             isPrivileged = ['creator', 'administrator'].includes(member.status);
-        } catch (_) {}
+        } catch (err) {
+            console.warn('getChatMember check failed, falling back to reporters list:', err.message);
+        }
         if (!isPrivileged) {
             const reporters = await getReporters();
             if (!reporters.includes(msg.from.username)) {
@@ -876,7 +882,7 @@ function registerRoutes(bot) {
         }
         
         console.error('Time command failed after 2 attempts:', lastError);
-        await bot.editMessageText('❌ Try again plesea', {
+        await bot.editMessageText('❌ Try again please', {
             chat_id: msg.chat.id,
             message_id: loadingMessage.message_id
         });
