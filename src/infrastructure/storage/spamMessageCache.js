@@ -57,15 +57,22 @@ const spamMessageCache = {
  */
 function isSimilarToSpam(message, threshold = 95) {
     const cachedSpamMessages = spamMessageCache.getAll();
-    
+    const msgLen = message.length;
+
     for (const spamMessage of cachedSpamMessages) {
+        // Quick length pre-filter: messages with very different lengths cannot be
+        // highly similar, so skip the expensive similarity calculation early.
+        const lenRatio = msgLen === 0 ? 0 : Math.min(msgLen, spamMessage.length) / Math.max(msgLen, spamMessage.length);
+        if (lenRatio * 100 < threshold) {
+            continue;
+        }
         const similarity = calculateTextSimilarity(message, spamMessage);
         if (similarity >= threshold) {
             console.log(`Found similar spam message (${similarity.toFixed(2)}% match)`);
             return true;
         }
     }
-    
+
     return false;
 }
 
