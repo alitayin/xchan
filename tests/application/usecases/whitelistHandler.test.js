@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createRequire } from 'module';
+import { rmSync } from 'fs';
+import { join } from 'path';
 
 const require = createRequire(import.meta.url);
 
@@ -33,6 +35,28 @@ function makeMsg(text, overrides = {}) {
 
 beforeEach(() => {
     vi.restoreAllMocks();
+    // Clean up LevelDB data before each test
+    const dbPath = join(process.cwd(), 'data', 'whitelistKeywords');
+    try {
+        rmSync(dbPath, { recursive: true, force: true });
+    } catch (err) {
+        // Ignore if directory doesn't exist
+    }
+});
+
+afterEach(async () => {
+    // Close DB connection and clean up after each test
+    try {
+        await store.closeDB();
+    } catch (err) {
+        // Ignore if already closed
+    }
+    const dbPath = join(process.cwd(), 'data', 'whitelistKeywords');
+    try {
+        rmSync(dbPath, { recursive: true, force: true });
+    } catch (err) {
+        // Ignore if directory doesn't exist
+    }
 });
 describe('handleWhitelistingCommand', () => {
     it('sends usage hint via bot.sendMessage when no keyword', async () => {
@@ -94,6 +118,7 @@ describe('handleListWhitelistCommand', () => {
     it('sends a message to chat (LevelDB unavailable → empty list)', async () => {
         // In test env LevelDB is not open; getAllWhitelistKeywords returns [].
         // Handler should still call bot.sendMessage with a message to the chat.
+        vi.spyOn(store, 'getAllWhitelistKeywords').mockResolvedValue([]);
         const bot = makeBot();
         await handleListWhitelistCommand(makeMsg('/listwhitelist'), bot);
         expect(bot.sendMessage).toHaveBeenCalledWith(-100, expect.any(String), expect.anything());

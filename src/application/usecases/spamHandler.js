@@ -535,4 +535,5 @@ async function processGroupMessage(msg, bot, ports) {
 
 module.exports = {
     processGroupMessage,
+    buildCombinedAnalysisQuery,
 };
