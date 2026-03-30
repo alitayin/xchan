@@ -24,10 +24,7 @@ async function saveModsConfig(config) {
   }
 }
 
-function extractUsername(text) {
-  const match = text.match(/@?(\w+)/);
-  return match ? match[1] : null;
-}
+const { extractUsername } = require('../../domain/utils/text.js');
 
 async function handleAddLicense(msg, bot) {
   const parts = msg.text.trim().split(/\s+/);

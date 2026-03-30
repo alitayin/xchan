@@ -9,10 +9,7 @@ const { kickUser, deleteMessage } = require('../../infrastructure/telegram/admin
 const { isSpamMessage } = require('../../domain/policies/spamPolicy.js');
 const { sendPromptMessage } = require('../../infrastructure/telegram/promptMessenger.js');
 
-function getUserDisplayName(user) {
-    const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
-    return fullName || user.username || '';
-}
+const { getUserDisplayName } = require('../../domain/utils/text.js');
 
 function shouldCheckNewMemberUsername(user) {
     if (!user || user.is_bot) {
@@ -128,7 +125,6 @@ async function processNewMemberUsername(user, chatId, messageId, bot) {
 
 module.exports = {
     processNewMemberUsername,
-    getUserDisplayName,
     shouldCheckNewMemberUsername,
 };
 
