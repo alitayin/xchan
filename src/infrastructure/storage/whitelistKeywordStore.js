@@ -3,7 +3,17 @@ const path = require('path');
 
 // Initialize levelDB for whitelist keywords
 const dbPath = path.join(__dirname, '../../../data/whitelistKeywords');
-const db = new Level(dbPath, { valueEncoding: 'json' });
+let db = new Level(dbPath, { valueEncoding: 'json' });
+
+/**
+ * Ensure database is open
+ */
+async function ensureOpen() {
+    if (db.status === 'closed') {
+        db = new Level(dbPath, { valueEncoding: 'json' });
+    }
+    return db;
+}
 
 /**
  * Add a keyword to the whitelist
@@ -13,6 +23,7 @@ const db = new Level(dbPath, { valueEncoding: 'json' });
  */
 async function addWhitelistKeyword(keyword, addedBy) {
     try {
+        const database = await ensureOpen();
         const normalizedKeyword = keyword.toLowerCase().trim();
         const key = `keyword:${normalizedKeyword}`;
         const data = {
@@ -20,7 +31,7 @@ async function addWhitelistKeyword(keyword, addedBy) {
             addedBy,
             addedAt: new Date().toISOString()
         };
-        await db.put(key, data);
+        await database.put(key, data);
         console.log(`✅ Whitelist keyword added: "${normalizedKeyword}" by ${addedBy}`);
         return true;
     } catch (error) {
@@ -36,9 +47,10 @@ async function addWhitelistKeyword(keyword, addedBy) {
  */
 async function removeWhitelistKeyword(keyword) {
     try {
+        const database = await ensureOpen();
         const normalizedKeyword = keyword.toLowerCase().trim();
         const key = `keyword:${normalizedKeyword}`;
-        await db.del(key);
+        await database.del(key);
         console.log(`✅ Whitelist keyword removed: "${normalizedKeyword}"`);
         return true;
     } catch (error) {
@@ -54,9 +66,10 @@ async function removeWhitelistKeyword(keyword) {
  */
 async function isWhitelistKeyword(keyword) {
     try {
+        const database = await ensureOpen();
         const normalizedKeyword = keyword.toLowerCase().trim();
         const key = `keyword:${normalizedKeyword}`;
-        await db.get(key);
+        await database.get(key);
         return true;
     } catch (error) {
         if (error.code === 'LEVEL_NOT_FOUND') {
@@ -99,8 +112,9 @@ async function containsWhitelistKeyword(message) {
  */
 async function getAllWhitelistKeywords() {
     try {
+        const database = await ensureOpen();
         const keywords = [];
-        for await (const [key, value] of db.iterator()) {
+        for await (const [key, value] of database.iterator()) {
             if (key.startsWith('keyword:')) {
                 keywords.push(value);
             }
@@ -117,8 +131,10 @@ async function getAllWhitelistKeywords() {
  */
 async function closeDB() {
     try {
-        await db.close();
-        console.log('✅ Whitelist keyword database closed');
+        if (db.status !== 'closed') {
+            await db.close();
+            console.log('✅ Whitelist keyword database closed');
+        }
     } catch (error) {
         console.error('Failed to close whitelist keyword database:', error);
     }
