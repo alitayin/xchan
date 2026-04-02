@@ -528,6 +528,11 @@ async function checkStoredMessageExists(commandName) {
     return await messageExists(commandName);
 }
 
+// For testing: clear pending overwrites
+function clearPendingOverwrites() {
+    pendingOverwrites.clear();
+}
+
 module.exports = {
     handleMessageCommand,
     handleShowMessageCommand,
@@ -536,6 +541,7 @@ module.exports = {
     handleStoredMessageCommand,
     handleStopMessageCommand,
     handleListScheduledCommand,
-    checkStoredMessageExists
+    checkStoredMessageExists,
+    clearPendingOverwrites
 };
 
