@@ -24,6 +24,26 @@ jobs:
         npm update
         npm audit fix || true
 
+    - name: Create test .env file
+      run: |
+        cat > .env << EOF
+        API_KEY=test_key
+        API_ENDPOINT=https://test.api.com
+        TELEGRAM_TOKEN=test_token
+        BOT_USERNAME=test_bot
+        TARGET_GROUP_IDS=-100123456789
+        NOTIFICATION_GROUP_ID=-100123456789
+        SPAM_THRESHOLD=0.7
+        ADDITIONAL_API_KEY=test_additional_key
+        SECONDARY_SPAM_API_KEY=test_secondary_key
+        ALLOWED_USERS=testuser
+        BLOCKED_USERS=
+        DATA_KEYWORDS=
+        ALITAYIN_USER_ID=123456
+        KOUSH_USER_ID=789012
+        ECASH_ARMY_GROUP_ID=-100123456789
+        EOF
+
     - name: Run tests
       run: npm test
 
