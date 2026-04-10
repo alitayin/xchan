@@ -2,7 +2,7 @@ const { getAllUserStats, decrementUserCompletionCount } = require('../../infrast
 const { getUserAddress } = require('../../infrastructure/storage/userAddressStore.js');
 const { ensureAddressWithFallback } = require('../../infrastructure/blockchain/addressUtils.js');
 const { resolveTokenAlias, getTokenInfo } = require('../../infrastructure/blockchain/tokenInfo.js');
-const { sendSlp, sendAlp, isMnemonicConfigured } = require('../../infrastructure/blockchain/tokenSender.js');
+const { sendToken, isMnemonicConfigured } = require('../../infrastructure/blockchain/tokenSender.js');
 const { NOTIFICATION_GROUP_ID } = require('../../../config/config.js');
 
 // Constants
@@ -47,13 +47,13 @@ async function checkAndDistributeRewards(bot) {
         // Resolve token info
         const tokenId = resolveTokenAlias(REWARD_TOKEN_ALIAS);
         const tokenInfo = await getTokenInfo(tokenId);
-        const { decimals: tokenDecimals, ticker: tokenTicker, name: tokenName, protocol: tokenProtocol } = tokenInfo;
+        const { decimals: tokenDecimals, ticker: tokenTicker, name: tokenName } = tokenInfo;
 
         // Process each eligible user
         for (const userStats of eligibleUsers) {
             try {
                 const userId = parseInt(userStats.userId, 10);
-                await processUserReward(bot, userId, userStats, tokenId, tokenDecimals, tokenTicker || tokenName, tokenProtocol);
+                await processUserReward(bot, userId, userStats, tokenId, tokenDecimals, tokenTicker || tokenName);
             } catch (error) {
                 console.error(`❌ Failed to process reward for user ${userStats.userId}:`, error.message);
             }
@@ -75,9 +75,8 @@ async function checkAndDistributeRewards(bot) {
  * @param {string} tokenId - Token ID to send
  * @param {number} tokenDecimals - Token decimals
  * @param {string} tokenName - Token name/ticker
- * @param {string} tokenProtocol - Token protocol (SLP or ALP)
  */
-async function processUserReward(bot, userId, userStats, tokenId, tokenDecimals, tokenName, tokenProtocol) {
+async function processUserReward(bot, userId, userStats, tokenId, tokenDecimals, tokenName) {
     // Get user's registered address
     const addressData = await getUserAddress(userId);
     if (!addressData) {
@@ -89,16 +88,11 @@ async function processUserReward(bot, userId, userStats, tokenId, tokenDecimals,
     const username = addressData.username || 'unknown';
 
     // Calculate reward amount in base units (use BigInt to avoid float precision issues)
-    const amountInBaseUnits = Number(BigInt(REWARD_AMOUNT) * (10n ** BigInt(tokenDecimals)));
-    const recipients = [{ address: recipientAddress, amount: amountInBaseUnits }];
+    const amountInAtoms = BigInt(REWARD_AMOUNT) * (10n ** BigInt(tokenDecimals));
+    const recipients = [{ address: recipientAddress, amount: amountInAtoms }];
 
     // Send tokens
-    let result;
-    if (tokenProtocol === 'ALP') {
-        result = await sendAlp(recipients, tokenId, tokenDecimals);
-    } else {
-        result = await sendSlp(recipients, tokenId, tokenDecimals);
-    }
+    const result = await sendToken(recipients, tokenId);
 
     // Decrement user's mission count
     await decrementUserCompletionCount(userId, MISSIONS_REQUIRED);
@@ -173,4 +167,3 @@ module.exports = {
     startRewardScheduler,
     checkAndDistributeRewards
 };
-

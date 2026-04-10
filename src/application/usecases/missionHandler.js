@@ -11,7 +11,7 @@ const {
 const { getUserAddress } = require('../../infrastructure/storage/userAddressStore.js');
 const { ensureAddressWithFallback } = require('../../infrastructure/blockchain/addressUtils.js');
 const { resolveTokenAlias } = require('../../infrastructure/blockchain/tokenInfo.js');
-const { sendSlp, isMnemonicConfigured } = require('../../infrastructure/blockchain/tokenSender.js');
+const { sendToken, isMnemonicConfigured } = require('../../infrastructure/blockchain/tokenSender.js');
 const { NOTIFICATION_GROUP_ID } = require('../../../config/config.js');
 const { sendPromptMessage } = require('../../infrastructure/telegram/promptMessenger.js');
 
@@ -132,13 +132,10 @@ async function handleMissionCompletion(msg, bot) {
             return;
         }
 
-        const amount = 1;
-        const decimals = 0;
-        const amountInBaseUnits = amount * Math.pow(10, decimals);
-        const recipients = [{ address: recipientAddress, amount: amountInBaseUnits }];
+        const recipients = [{ address: recipientAddress, amount: 1n }];
 
         try {
-            const result = await sendSlp(recipients, OORAH_TOKEN_ID, decimals);
+            const result = await sendToken(recipients, OORAH_TOKEN_ID);
             await recordMissionCompletion(mission.id, userId, username);
 
             if (NOTIFICATION_GROUP_ID) {
@@ -332,4 +329,3 @@ module.exports = {
     handleShowMissionCommand,
     handleDeleteMissionCommand
 };
-

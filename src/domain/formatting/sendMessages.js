@@ -21,10 +21,10 @@ function formatSendUsage() {
 function formatDetailedSendUsage() {
     return '❌ Invalid command format.\n\n' +
            'Usage:\n' +
-           '💵 /send <amount> - Send XEC (amount in XEC)\n' +
-           '🪙 /send <tokenId|alias> <amount> - Send SLP/ALP tokens (amount in tokens)\n\n' +
+           '💵 /send <amount> - Send XEC (amount in XEC, decimals supported)\n' +
+           '🪙 /send <tokenId|alias> <amount> - Send SLP/ALP tokens (amount in tokens, decimals supported up to token precision)\n\n' +
            'Example:\n' +
-           '/send 100 - Send 100 XEC\n' +
+           '/send 100.50 - Send 100.50 XEC\n' +
            '/send oorah 224 - Send 224 OORAH tokens (using alias)\n' +
            '/send aed861a31b96934b88c0252ede135cb9700d7649f69191235087a3030e553cb1 224 - Send 224 tokens (using full token ID)\n\n' +
            '💡 System will automatically detect token type (SLP/ALP) and decimals';
@@ -83,7 +83,9 @@ function formatLoadingMessage(isXecSend) {
  * @returns {string}
  */
 function formatSuccessMessage(amount, currencyName, username, txid, decimals = 2) {
-    const displayAmount = amount.toFixed(decimals);
+    const displayAmount = typeof amount === 'string'
+        ? amount
+        : Number(amount).toFixed(decimals);
     return `✅ Successfully sent ${displayAmount} ${currencyName} to @${escapeMarkdown(username)}!\n\n` +
            `💰 Amount: ${displayAmount}${currencyName === 'XEC' ? ' XEC' : ''}\n` +
            `🔍 [View on Explorer](https://explorer.e.cash/tx/${txid})`;
@@ -121,5 +123,4 @@ module.exports = {
     formatSuccessMessage,
     formatSendError
 };
-
 

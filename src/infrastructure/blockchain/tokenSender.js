@@ -1,9 +1,21 @@
 // Token sending operations via ecash-quicksend
 // Infrastructure layer module
 
-const quick = require('ecash-quicksend');
 const { ChronikClient } = require('chronik-client');
 const { CHRONIK_URLS } = require('../../../config/config.js');
+const { getQuicksendApi } = require('./quicksendClient.js');
+
+function assertRecipientsUseBigInt(recipients) {
+    if (!Array.isArray(recipients) || recipients.length === 0) {
+        throw new Error('Recipients must be a non-empty array');
+    }
+
+    for (const recipient of recipients) {
+        if (!recipient?.address || typeof recipient.amount !== 'bigint') {
+            throw new Error('Recipients must include address and bigint amount');
+        }
+    }
+}
 
 /**
  * Get mnemonic from environment
@@ -18,17 +30,17 @@ function getMnemonic() {
  * @returns {ChronikClient} Chronik client instance
  */
 function createChronikClient() {
-    const chronikUrl = CHRONIK_URLS[0];
-    if (!chronikUrl) {
+    if (!Array.isArray(CHRONIK_URLS) || CHRONIK_URLS.length === 0) {
         throw new Error('CHRONIK_URLS not configured properly');
     }
-    console.log(`📡 Using Chronik client: ${chronikUrl}`);
-    return new ChronikClient(chronikUrl);
+
+    console.log(`📡 Using Chronik client: ${CHRONIK_URLS[0]}`);
+    return new ChronikClient(CHRONIK_URLS);
 }
 
 /**
  * Send XEC to recipients
- * @param {Array<{address: string, amount: number}>} recipients - Array of recipients with amounts in satoshis
+ * @param {Array<{address: string, amount: bigint}>} recipients - Array of recipients with amounts in satoshis
  * @returns {Promise<{txid: string}>} Transaction result
  */
 async function sendXec(recipients) {
@@ -36,9 +48,11 @@ async function sendXec(recipients) {
     if (!mnemonic) {
         throw new Error('MNEMONIC not configured in environment variables');
     }
+    assertRecipientsUseBigInt(recipients);
 
     const chronik = createChronikClient();
-    
+    const quick = await getQuicksendApi();
+
     return await quick.sendXec(recipients, {
         mnemonic: mnemonic,
         chronik: chronik
@@ -46,49 +60,46 @@ async function sendXec(recipients) {
 }
 
 /**
- * Send SLP tokens to recipients
- * @param {Array<{address: string, amount: number}>} recipients - Recipients with amounts in base units
+ * Send tokens to recipients using the latest ecash-quicksend unified API.
+ * @param {Array<{address: string, amount: bigint}>} recipients - Recipients with amounts in token atoms
  * @param {string} tokenId - Token ID
- * @param {number} tokenDecimals - Token decimals
  * @returns {Promise<{txid: string}>} Transaction result
  */
-async function sendSlp(recipients, tokenId, tokenDecimals) {
+async function sendToken(recipients, tokenId) {
     const mnemonic = getMnemonic();
     if (!mnemonic) {
         throw new Error('MNEMONIC not configured in environment variables');
     }
+    assertRecipientsUseBigInt(recipients);
 
     const chronik = createChronikClient();
-    
-    return await quick.sendSlp(recipients, {
+    const quick = await getQuicksendApi();
+
+    return await quick.sendToken(recipients, {
         tokenId: tokenId,
-        tokenDecimals: tokenDecimals,
         mnemonic: mnemonic,
         chronik: chronik
     });
 }
 
 /**
- * Send ALP tokens to recipients
- * @param {Array<{address: string, amount: number}>} recipients - Recipients with amounts in base units
+ * Deprecated compatibility wrapper.
+ * @param {Array<{address: string, amount: bigint}>} recipients - Recipients with amounts in token atoms
  * @param {string} tokenId - Token ID
- * @param {number} tokenDecimals - Token decimals
  * @returns {Promise<{txid: string}>} Transaction result
  */
-async function sendAlp(recipients, tokenId, tokenDecimals) {
-    const mnemonic = getMnemonic();
-    if (!mnemonic) {
-        throw new Error('MNEMONIC not configured in environment variables');
-    }
+async function sendSlp(recipients, tokenId) {
+    return await sendToken(recipients, tokenId);
+}
 
-    const chronik = createChronikClient();
-    
-    return await quick.sendAlp(recipients, {
-        tokenId: tokenId,
-        tokenDecimals: tokenDecimals,
-        mnemonic: mnemonic,
-        chronik: chronik
-    });
+/**
+ * Deprecated compatibility wrapper.
+ * @param {Array<{address: string, amount: bigint}>} recipients - Recipients with amounts in token atoms
+ * @param {string} tokenId - Token ID
+ * @returns {Promise<{txid: string}>} Transaction result
+ */
+async function sendAlp(recipients, tokenId) {
+    return await sendToken(recipients, tokenId);
 }
 
 /**
@@ -101,9 +112,8 @@ function isMnemonicConfigured() {
 
 module.exports = {
     sendXec,
+    sendToken,
     sendSlp,
     sendAlp,
     isMnemonicConfigured
 };
-
-

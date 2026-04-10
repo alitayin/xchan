@@ -1,8 +1,9 @@
 const { getUserAddress } = require('../../infrastructure/storage/userAddressStore.js');
 const { ensureAddressWithFallback } = require('../../infrastructure/blockchain/addressUtils.js');
 const { resolveTokenAlias, getTokenInfo } = require('../../infrastructure/blockchain/tokenInfo.js');
-const { sendXec, sendSlp, sendAlp, isMnemonicConfigured } = require('../../infrastructure/blockchain/tokenSender.js');
+const { sendXec, sendToken, isMnemonicConfigured } = require('../../infrastructure/blockchain/tokenSender.js');
 const { sendMessage, editMessageText } = require('../../infrastructure/telegram/messagingActions.js');
+const { parseDisplayAmountToAtoms, formatAtomsToDisplay } = require('../../domain/utils/amounts.js');
 const {
     formatSendUsage,
     formatDetailedSendUsage,
@@ -39,10 +40,9 @@ async function handleSendCommand(msg, bot) {
     if (tokenId) {
         tokenId = resolveTokenAlias(tokenId);
     }
-    
-    const amount = parseInt(isXecSend ? parts[1] : parts[2], 10);
 
-    if (!Number.isFinite(amount) || amount <= 0) {
+    const amountInput = (isXecSend ? parts[1] : parts[2]) || '';
+    if (!/^\d+(\.\d+)?$/.test(amountInput.trim())) {
         await sendMessage(bot, msg.chat.id, formatInvalidAmountError());
         return;
     }
@@ -74,11 +74,7 @@ async function handleSendCommand(msg, bot) {
         return;
     }
 
-    const loadingMsg = await sendMessage(
-        bot, 
-        msg.chat.id, 
-        formatLoadingMessage(isXecSend)
-    );
+    let loadingMsg;
 
     try {
         let result;
@@ -86,12 +82,18 @@ async function handleSendCommand(msg, bot) {
         let currencyName;
         let decimals;
 
+        loadingMsg = await sendMessage(
+            bot,
+            msg.chat.id,
+            formatLoadingMessage(isXecSend)
+        );
+
         if (isXecSend) {
-            const amountInSatoshis = amount * 100;
+            const amountInSatoshis = parseDisplayAmountToAtoms(amountInput, 2);
             const recipients = [{ address: recipientAddress, amount: amountInSatoshis }];
             
             result = await sendXec(recipients);
-            displayAmount = amount;
+            displayAmount = formatAtomsToDisplay(amountInSatoshis, 2);
             currencyName = 'XEC';
             decimals = 2;
 
@@ -100,20 +102,16 @@ async function handleSendCommand(msg, bot) {
             const tokenInfo = await getTokenInfo(tokenId);
             const { decimals: tokenDecimals, ticker: tokenTicker, name: tokenName, protocol: tokenProtocol } = tokenInfo;
             
-            const amountInBaseUnits = amount * Math.pow(10, tokenDecimals);
-            const recipients = [{ address: recipientAddress, amount: amountInBaseUnits }];
-            
-            if (tokenProtocol === 'ALP') {
-                result = await sendAlp(recipients, tokenId, tokenDecimals);
-            } else {
-                result = await sendSlp(recipients, tokenId, tokenDecimals);
-            }
+            const amountInAtoms = parseDisplayAmountToAtoms(amountInput, tokenDecimals);
+            const recipients = [{ address: recipientAddress, amount: amountInAtoms }];
 
-            displayAmount = amount;
+            result = await sendToken(recipients, tokenId);
+
+            displayAmount = formatAtomsToDisplay(amountInAtoms, tokenDecimals);
             currencyName = tokenTicker || tokenName;
             decimals = tokenDecimals;
             
-            console.log(`Sent ${displayAmount} ${currencyName} [${tokenProtocol}] (${amountInBaseUnits} base units, decimals: ${tokenDecimals}) to @${recipientUsername} (${recipientUserId}): ${result.txid}`);
+            console.log(`Sent ${displayAmount} ${currencyName} [${tokenProtocol}] (${amountInAtoms} atoms, decimals: ${tokenDecimals}) to @${recipientUsername} (${recipientUserId}): ${result.txid}`);
         }
 
         await editMessageText(
@@ -128,13 +126,22 @@ async function handleSendCommand(msg, bot) {
         );
     } catch (error) {
         console.error('Error sending tokens:', error);
-        
-        await editMessageText(
-            bot,
-            msg.chat.id,
-            loadingMsg.message_id,
-            formatSendError(error)
-        );
+
+        const errorText = /amount|precision/i.test(error.message || '')
+            ? formatInvalidAmountError()
+            : formatSendError(error);
+
+        if (loadingMsg?.message_id) {
+            await editMessageText(
+                bot,
+                msg.chat.id,
+                loadingMsg.message_id,
+                errorText
+            );
+            return;
+        }
+
+        await sendMessage(bot, msg.chat.id, errorText);
     }
 }
 

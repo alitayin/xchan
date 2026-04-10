@@ -23,12 +23,11 @@ function getWallet() {
         return cachedWallet;
     }
 
-    const chronikUrl = CHRONIK_URLS[0];
-    if (!chronikUrl) {
+    if (!Array.isArray(CHRONIK_URLS) || CHRONIK_URLS.length === 0) {
         throw new Error('CHRONIK_URLS not configured properly');
     }
 
-    const chronik = new ChronikClient(chronikUrl);
+    const chronik = new ChronikClient(CHRONIK_URLS);
     cachedWallet = Wallet.fromMnemonic(mnemonic, chronik, { hd: true });
     cachedMnemonic = mnemonic;
     return cachedWallet;
@@ -51,4 +50,3 @@ module.exports = {
     getReceiveAddressAtIndex,
     isMnemonicConfigured
 };
-

@@ -10,11 +10,10 @@ const TOKEN_ALIASES = require('../../../config/tokenAliases.js');
  * @returns {ChronikClient}
  */
 function createChronikClient() {
-    const chronikUrl = CHRONIK_URLS[0];
-    if (!chronikUrl) {
+    if (!Array.isArray(CHRONIK_URLS) || CHRONIK_URLS.length === 0) {
         throw new Error('CHRONIK_URLS is empty. Please set CHRONIK_URLS in environment variables.');
     }
-    return new ChronikClient(chronikUrl);
+    return new ChronikClient(CHRONIK_URLS);
 }
 
 /**
@@ -72,5 +71,3 @@ module.exports = {
     resolveTokenAlias,
     getTokenInfo
 };
-
-
