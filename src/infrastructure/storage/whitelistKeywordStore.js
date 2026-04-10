@@ -4,14 +4,23 @@ const path = require('path');
 // Initialize levelDB for whitelist keywords
 const dbPath = path.join(__dirname, '../../../data/whitelistKeywords');
 let db = new Level(dbPath, { valueEncoding: 'json' });
+let dbOpenPromise = db.open();
 
 /**
- * Ensure database is open
+ * Ensure database is open and ready
  */
 async function ensureOpen() {
-    if (db.status === 'closed') {
-        db = new Level(dbPath, { valueEncoding: 'json' });
+    if (db.status === 'open') {
+        return db;
     }
+    if (db.status === 'opening') {
+        await dbOpenPromise;
+        return db;
+    }
+    // status === 'closed' or 'new'
+    db = new Level(dbPath, { valueEncoding: 'json' });
+    dbOpenPromise = db.open();
+    await dbOpenPromise;
     return db;
 }
 
@@ -127,16 +136,15 @@ async function getAllWhitelistKeywords() {
 }
 
 /**
- * Close database connection
+ * Close database connection (idempotent — safe to call multiple times)
  */
 async function closeDB() {
     try {
-        if (db.status !== 'closed') {
+        if (db && db.status !== 'closed') {
             await db.close();
-            console.log('✅ Whitelist keyword database closed');
         }
-    } catch (error) {
-        console.error('Failed to close whitelist keyword database:', error);
+    } catch {
+        // ignore — already closed or in error state
     }
 }
 

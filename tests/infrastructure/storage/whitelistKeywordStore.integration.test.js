@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -8,7 +8,6 @@ const {
     isWhitelistKeyword,
     containsWhitelistKeyword,
     getAllWhitelistKeywords,
-    closeDB,
 } = require('../../../src/infrastructure/storage/whitelistKeywordStore.js');
 
 // All test keywords are prefixed to avoid colliding with real data
@@ -27,11 +26,6 @@ async function cleanupTestKeys() {
 
 beforeEach(async () => {
     await cleanupTestKeys();
-});
-
-afterAll(async () => {
-    await cleanupTestKeys();
-    await closeDB();
 });
 
 describe('whitelistKeywordStore – integration: CRUD', () => {

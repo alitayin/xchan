@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createRequire } from 'module';
-import { rmSync } from 'fs';
-import { join } from 'path';
 
 const require = createRequire(import.meta.url);
 
@@ -35,27 +33,19 @@ function makeMsg(text, overrides = {}) {
 
 beforeEach(() => {
     vi.restoreAllMocks();
-    // Clean up LevelDB data before each test
-    const dbPath = join(process.cwd(), 'data', 'whitelistKeywords');
-    try {
-        rmSync(dbPath, { recursive: true, force: true });
-    } catch (err) {
-        // Ignore if directory doesn't exist
-    }
 });
 
 afterEach(async () => {
-    // Close DB connection and clean up after each test
+    // Clean up test keywords only — don't touch the shared DB
     try {
-        await store.closeDB();
-    } catch (err) {
-        // Ignore if already closed
-    }
-    const dbPath = join(process.cwd(), 'data', 'whitelistKeywords');
-    try {
-        rmSync(dbPath, { recursive: true, force: true });
-    } catch (err) {
-        // Ignore if directory doesn't exist
+        const all = await store.getAllWhitelistKeywords();
+        for (const entry of all) {
+            if (entry.keyword.startsWith('__integ_test__')) {
+                await store.removeWhitelistKeyword(entry.keyword);
+            }
+        }
+    } catch {
+        // Ignore errors during cleanup
     }
 });
 describe('handleWhitelistingCommand', () => {
