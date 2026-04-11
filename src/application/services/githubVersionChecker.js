@@ -6,7 +6,7 @@ const REPO_NAME = 'echanTGbot';
 const REMOTE_PACKAGE_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/package.json`;
 const REPO_URL = `https://github.com/${REPO_OWNER}/${REPO_NAME}`;
 const RELEASE_API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/tags`;
-const CHECK_INTERVAL_MS = parseInt(process.env.GITHUB_VERSION_CHECK_INTERVAL_MS || String(60 * 60 * 1000));
+const CHECK_INTERVAL_MS = parseInt(process.env.GITHUB_VERSION_CHECK_INTERVAL_MS || String(5 * 60 * 1000));
 
 const localVersion = (() => {
     try {
