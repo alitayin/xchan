@@ -4,6 +4,13 @@ export default defineConfig({
     test: {
         environment: 'node',
         pool: 'forks',
+        poolOptions: {
+            forks: {
+                // The whitelist LevelDB integration tests use a shared on-disk DB path.
+                // Running the suite in a single child process avoids cross-worker lock contention.
+                singleFork: true,
+            },
+        },
         fileParallelism: false,
         server: {
             deps: {

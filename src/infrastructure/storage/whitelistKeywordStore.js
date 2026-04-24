@@ -2,7 +2,9 @@ const { Level } = require('level');
 const path = require('path');
 
 // Initialize levelDB for whitelist keywords
-const dbPath = path.join(__dirname, '../../../data/whitelistKeywords');
+const dbPath = process.env.WHITELIST_KEYWORD_DB_PATH
+    ? path.resolve(process.env.WHITELIST_KEYWORD_DB_PATH)
+    : path.join(__dirname, '../../../data/whitelistKeywords');
 let db = new Level(dbPath, { valueEncoding: 'json' });
 let dbOpenPromise = db.open();
 
@@ -156,4 +158,3 @@ module.exports = {
     getAllWhitelistKeywords,
     closeDB
 };
-

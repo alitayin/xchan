@@ -1,5 +1,15 @@
 // Test setup file - runs before all tests
 import { afterEach, beforeEach, vi } from 'vitest';
+import os from 'os';
+import path from 'path';
+
+if (!process.env.WHITELIST_KEYWORD_DB_PATH) {
+    process.env.WHITELIST_KEYWORD_DB_PATH = path.join(
+        os.tmpdir(),
+        'xecbot-vitest',
+        `whitelistKeywords-${process.pid}`
+    );
+}
 
 const LEVEL_TEARDOWN_PATTERNS = [
     'LEVEL_DATABASE_NOT_OPEN',
