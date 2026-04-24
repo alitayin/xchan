@@ -24,14 +24,17 @@ vi.mock('../../../config/config.js', () => ({
 }));
 
 const require = createRequire(import.meta.url);
-const axios = require('axios');
-const {
-    safelyEvaluateSecondaryContent,
-} = require('../../../src/infrastructure/ai/secondaryContentEvaluator.js');
+let axios;
+let safelyEvaluateSecondaryContent;
 
 describe('secondaryContentEvaluator', () => {
     beforeEach(() => {
+        vi.resetModules();
         vi.clearAllMocks();
+        axios = require('axios');
+        ({
+            safelyEvaluateSecondaryContent,
+        } = require('../../../src/infrastructure/ai/secondaryContentEvaluator.js'));
     });
 
     it('uses OpenRouter structured output with the GPT-5.1 secondary model', async () => {

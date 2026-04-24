@@ -28,12 +28,15 @@ vi.mock('../../../config/config.js', () => ({
 vi.mock('../../../src/utils/logger.js', () => state.logger);
 
 const require = createRequire(import.meta.url);
-const axios = require('axios');
-const { fetchMessageAnalysisWithImage } = require('../../../src/infrastructure/ai/messageAnalysis.js');
+let axios;
+let fetchMessageAnalysisWithImage;
 
 describe('messageAnalysis OpenRouter image fallback', () => {
     beforeEach(() => {
+        vi.resetModules();
         vi.clearAllMocks();
+        axios = require('axios');
+        ({ fetchMessageAnalysisWithImage } = require('../../../src/infrastructure/ai/messageAnalysis.js'));
     });
 
     it('falls back to plain JSON mode on image structured-output provider rejection', async () => {
