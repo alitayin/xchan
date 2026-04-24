@@ -1,5 +1,5 @@
 import { createRequire } from 'module';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('axios');
 
@@ -12,31 +12,53 @@ const state = vi.hoisted(() => ({
     },
 }));
 
-vi.mock('../../../config/config.js', () => ({
-    API_ENDPOINT: 'https://legacy.example/chat-messages',
-    ADDITIONAL_API_KEY: '',
-    ADDITIONAL_API_KEY_BACKUP: '',
-    MESSAGE_ANALYSIS_PROVIDER: 'openrouter',
-    OPENROUTER_API_KEY: 'or-key',
-    OPENROUTER_BASE_URL: 'https://openrouter.ai/api/v1',
-    OPENROUTER_ANALYSIS_MODEL: 'openai/gpt-4.1-mini',
-    OPENROUTER_HTTP_REFERER: '',
-    OPENROUTER_APP_TITLE: 'xecbot-tests',
-    OPENROUTER_TIMEOUT_MS: 60000,
-}));
-
 vi.mock('../../../src/utils/logger.js', () => state.logger);
 
 const require = createRequire(import.meta.url);
+const configPath = require.resolve('../../../config/config.js');
+const openRouterConfigPath = require.resolve('../../../src/infrastructure/ai/openRouterConfig.js');
+const messageAnalysisPath = require.resolve('../../../src/infrastructure/ai/messageAnalysis.js');
+const ORIGINAL_ENV = { ...process.env };
 let axios;
 let fetchMessageAnalysisWithImage;
+
+function restoreEnv() {
+    for (const key of Object.keys(process.env)) {
+        if (!(key in ORIGINAL_ENV)) {
+            delete process.env[key];
+        }
+    }
+    Object.assign(process.env, ORIGINAL_ENV);
+}
+
+function prepareOpenRouterEnv() {
+    process.env.API_ENDPOINT = 'https://legacy.example/chat-messages';
+    process.env.MESSAGE_ANALYSIS_PROVIDER = 'openrouter';
+    process.env.OPENROUTER_API_KEY = 'or-key';
+    process.env.OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+    process.env.OPENROUTER_ANALYSIS_MODEL = 'openai/gpt-4.1-mini';
+    process.env.OPENROUTER_HTTP_REFERER = '';
+    process.env.OPENROUTER_APP_TITLE = 'xecbot-tests';
+    process.env.OPENROUTER_TIMEOUT_MS = '60000';
+    delete process.env.ADDITIONAL_API_KEY;
+    delete process.env.ADDITIONAL_API_KEY_BACKUP;
+}
 
 describe('messageAnalysis OpenRouter image fallback', () => {
     beforeEach(() => {
         vi.resetModules();
         vi.clearAllMocks();
+        restoreEnv();
+        prepareOpenRouterEnv();
+        delete require.cache[configPath];
+        delete require.cache[openRouterConfigPath];
+        delete require.cache[messageAnalysisPath];
         axios = require('axios');
-        ({ fetchMessageAnalysisWithImage } = require('../../../src/infrastructure/ai/messageAnalysis.js'));
+        ({ fetchMessageAnalysisWithImage } = require(messageAnalysisPath));
+    });
+
+    afterEach(() => {
+        restoreEnv();
     });
 
     it('falls back to plain JSON mode on image structured-output provider rejection', async () => {

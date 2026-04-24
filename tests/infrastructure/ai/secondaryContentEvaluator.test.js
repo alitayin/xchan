@@ -1,40 +1,56 @@
 import { createRequire } from 'module';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('axios');
 
-vi.mock('../../../config/config.js', () => ({
-    API_ENDPOINT: 'https://legacy.example/chat-messages',
-    SECONDARY_SPAM_API_KEY: '',
-    SECONDARY_SPAM_API_KEY_BACKUP: '',
-    SECONDARY_SPAM_PROVIDER: 'openrouter',
-    OPENROUTER_API_KEY: 'or-key',
-    OPENROUTER_BASE_URL: 'https://openrouter.ai/api/v1',
-    OPENROUTER_SECONDARY_MODEL: 'openai/gpt-5.1',
-    OPENROUTER_HTTP_REFERER: '',
-    OPENROUTER_APP_TITLE: 'xecbot-tests',
-    OPENROUTER_TIMEOUT_MS: 60000,
-    OPENROUTER_TELEGRAM_IMAGE_MODE: 'remote_url',
-    OPENROUTER_PROVIDER_ORDER: [],
-    OPENROUTER_PROVIDER_ONLY: [],
-    OPENROUTER_PROVIDER_IGNORE: [],
-    OPENROUTER_PROVIDER_ALLOW_FALLBACKS: undefined,
-    OPENROUTER_PROVIDER_SORT: '',
-    OPENROUTER_PROVIDER_ZDR: undefined,
-}));
-
 const require = createRequire(import.meta.url);
+const configPath = require.resolve('../../../config/config.js');
+const openRouterConfigPath = require.resolve('../../../src/infrastructure/ai/openRouterConfig.js');
+const evaluatorPath = require.resolve('../../../src/infrastructure/ai/secondaryContentEvaluator.js');
+const ORIGINAL_ENV = { ...process.env };
 let axios;
 let safelyEvaluateSecondaryContent;
+
+function restoreEnv() {
+    for (const key of Object.keys(process.env)) {
+        if (!(key in ORIGINAL_ENV)) {
+            delete process.env[key];
+        }
+    }
+    Object.assign(process.env, ORIGINAL_ENV);
+}
+
+function prepareOpenRouterEnv() {
+    process.env.API_ENDPOINT = 'https://legacy.example/chat-messages';
+    process.env.SECONDARY_SPAM_PROVIDER = 'openrouter';
+    process.env.OPENROUTER_API_KEY = 'or-key';
+    process.env.OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+    process.env.OPENROUTER_SECONDARY_MODEL = 'openai/gpt-5.1';
+    process.env.OPENROUTER_HTTP_REFERER = '';
+    process.env.OPENROUTER_APP_TITLE = 'xecbot-tests';
+    process.env.OPENROUTER_TIMEOUT_MS = '60000';
+    process.env.OPENROUTER_TELEGRAM_IMAGE_MODE = 'remote_url';
+    delete process.env.SECONDARY_SPAM_API_KEY;
+    delete process.env.SECONDARY_SPAM_API_KEY_BACKUP;
+}
 
 describe('secondaryContentEvaluator', () => {
     beforeEach(() => {
         vi.resetModules();
         vi.clearAllMocks();
+        restoreEnv();
+        prepareOpenRouterEnv();
+        delete require.cache[configPath];
+        delete require.cache[openRouterConfigPath];
+        delete require.cache[evaluatorPath];
         axios = require('axios');
         ({
             safelyEvaluateSecondaryContent,
-        } = require('../../../src/infrastructure/ai/secondaryContentEvaluator.js'));
+        } = require(evaluatorPath));
+    });
+
+    afterEach(() => {
+        restoreEnv();
     });
 
     it('uses OpenRouter structured output with the GPT-5.1 secondary model', async () => {
