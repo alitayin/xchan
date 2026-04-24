@@ -41,6 +41,13 @@ function getImageFileId(msg) {
     return null;
 }
 
+function redactTelegramFileUrl(fileUrl) {
+    if (typeof fileUrl !== 'string') {
+        return fileUrl;
+    }
+    return fileUrl.replace(/\/file\/bot[^/]+\//, '/file/bot<redacted>/');
+}
+
 /**
  * Get image file URLs from Telegram message
  * @param {Object} msg - Telegram message object
@@ -57,7 +64,7 @@ async function getImageUrls(msg, bot) {
         try {
             const fileLink = await bot.getFileLink(largestPhoto.file_id);
             imageUrls.push(fileLink);
-            console.log(`Found photo in message: ${fileLink}`);
+            console.log(`Found photo in message: ${redactTelegramFileUrl(fileLink)}`);
         } catch (error) {
             console.error('Failed to get photo file link:', error);
         }
@@ -68,7 +75,7 @@ async function getImageUrls(msg, bot) {
         try {
             const fileLink = await bot.getFileLink(msg.sticker.thumbnail.file_id);
             imageUrls.push(fileLink);
-            console.log(`Found sticker thumbnail in message: ${fileLink}`);
+            console.log(`Found sticker thumbnail in message: ${redactTelegramFileUrl(fileLink)}`);
         } catch (error) {
             console.error('Failed to get sticker file link:', error);
         }
@@ -79,7 +86,7 @@ async function getImageUrls(msg, bot) {
         try {
             const fileLink = await bot.getFileLink(msg.document.file_id);
             imageUrls.push(fileLink);
-            console.log(`Found image document in message: ${fileLink}`);
+            console.log(`Found image document in message: ${redactTelegramFileUrl(fileLink)}`);
         } catch (error) {
             console.error('Failed to get document image file link:', error);
         }
@@ -92,7 +99,7 @@ async function getImageUrls(msg, bot) {
             try {
                 const fileLink = await bot.getFileLink(target.file_id);
                 imageUrls.push(fileLink);
-                console.log(`Found animation image in message: ${fileLink}`);
+                console.log(`Found animation image in message: ${redactTelegramFileUrl(fileLink)}`);
             } catch (error) {
                 console.error('Failed to get animation file link:', error);
             }
@@ -132,4 +139,3 @@ module.exports = {
     getPhotoUrl,
     getPhotoUrlSimple,
 };
-

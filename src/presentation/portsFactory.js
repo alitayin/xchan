@@ -20,7 +20,7 @@ function createPorts(bot) {
   };
 
   const secondarySpam = {
-    check: (query, userId) => performSecondarySpamCheck(query, userId),
+    check: (query, userId, imageUrls = null) => performSecondarySpamCheck(query, userId, imageUrls),
   };
 
   const translation = {
@@ -53,5 +53,4 @@ function createPorts(bot) {
 }
 
 module.exports = { createPorts };
-
 

@@ -15,10 +15,16 @@ async function withKeyRotation(clients, fn, opts = {}) {
   }
   const maxRetriesPerKey = opts.maxRetriesPerKey ?? 3;
   const maxTotalAttempts = opts.maxTotalAttempts ?? clients.length * maxRetriesPerKey;
+  const switchOnStatuses = new Set(
+    Array.isArray(opts.switchOnStatuses) && opts.switchOnStatuses.length > 0
+      ? opts.switchOnStatuses
+      : [400]
+  );
 
   let clientIndex = 0;
   let attemptsOnCurrentClient = 0;
   let totalAttempts = 0;
+  let lastError = null;
 
   while (totalAttempts < maxTotalAttempts && clientIndex < clients.length) {
     const client = clients[clientIndex];
@@ -27,27 +33,36 @@ async function withKeyRotation(clients, fn, opts = {}) {
       totalAttempts++;
       return await fn(client);
     } catch (error) {
-      const is400 = error.response?.status === 400;
-      if (is400) {
-        console.log(`API key rotation: got 400 on attempt ${totalAttempts}/${maxTotalAttempts}, switching key`);
+      lastError = error;
+      const status = error.response?.status;
+      const shouldSwitchClient = switchOnStatuses.has(status);
+      const hasAnotherClient = clientIndex < clients.length - 1;
+      if (shouldSwitchClient) {
+        if (hasAnotherClient) {
+          console.log(`API key rotation: got ${status} on attempt ${totalAttempts}/${maxTotalAttempts}, switching key`);
+        } else {
+          console.log(`API request got ${status} on attempt ${totalAttempts}/${maxTotalAttempts}, no backup key available`);
+        }
       } else {
         console.error(`API call failed (attempt ${totalAttempts}/${maxTotalAttempts}):`, error.message || error);
       }
 
       const exhaustedCurrentKey =
-        is400 || attemptsOnCurrentClient >= maxRetriesPerKey;
+        shouldSwitchClient || attemptsOnCurrentClient >= maxRetriesPerKey;
 
-      if (exhaustedCurrentKey && clientIndex < clients.length - 1) {
+      if (exhaustedCurrentKey && hasAnotherClient) {
         clientIndex++;
         attemptsOnCurrentClient = 0;
         console.log(`Switching to API client #${clientIndex + 1}`);
-      } else if (totalAttempts >= maxTotalAttempts || attemptsOnCurrentClient >= maxRetriesPerKey) {
+      } else if (shouldSwitchClient || totalAttempts >= maxTotalAttempts || attemptsOnCurrentClient >= maxRetriesPerKey) {
         break;
       }
     }
   }
 
-  throw new Error('withKeyRotation: all attempts exhausted');
+  const finalError = new Error('withKeyRotation: all attempts exhausted');
+  finalError.cause = lastError;
+  throw finalError;
 }
 
 module.exports = { withKeyRotation };
